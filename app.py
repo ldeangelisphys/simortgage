@@ -1,11 +1,15 @@
 from msilib.schema import Complus
 from dash import Dash, dcc, html
+from matplotlib.pyplot import ylabel
 import plotly.express as px
 import pandas as pd
 import numpy as np
 from dash.dependencies import Input,Output
 
-app = Dash(__name__)
+
+external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+
+app = Dash(__name__, external_stylesheets=external_stylesheets)
 
 colors = {
     'background': '#FFFFFF',
@@ -66,15 +70,19 @@ def visualize_mortgages(capital,ir,years):
 
     for k in ['FR','IT']:
 
+        total_expense = df[f'R_{k}'].sum()
+
         fig = px.area(df, x="Month", y=f"P_{k}",color_discrete_sequence=['blue'],
-                    labels={f"P_{k}": "Total monthly payment (€)", "Month": "# Month"}, title=f'{k} Mortgage')
-        temp_fig = px.area(df, x="Month", y=f"I_{k}",color_discrete_sequence=['orange']) 
+                    labels={f"P_{k}": "Repayment (€)", "Month": "# Month"},
+                    title=f'{k} Mortgage: total expense = {total_expense:,.2f} €')
+        temp_fig = px.area(df, x="Month", y=f"I_{k}",color_discrete_sequence=['orange'],
+        labels = {f'I_{k}':"Interest costs (€)"}) 
         fig.add_trace(temp_fig.data[0])
         fig['data'][0]['showlegend']=True
         fig['data'][0]['name']='Repayments'
         fig['data'][1]['showlegend']=True
         fig['data'][1]['name']='Interest costs'
-        fig.update_layout(yaxis_range=[0,M])
+        fig.update_layout(yaxis_range=[0,M],yaxis_title="Total monthly payment (€)")
 
         figs[k] = fig
 
@@ -82,42 +90,51 @@ def visualize_mortgages(capital,ir,years):
 
 app.layout = html.Div(style={'backgroundColor': colors['background']}, children=[
     html.H1(
-        children='Hello Dash',
+        children='Mortgage Simulator',
         style={
             'textAlign': 'center',
             'color': colors['text']
         }
     ),
 
-    html.Div(children='Dash: A web application framework for your data.', style={
+    html.Div(children='A web application framework to simulate your mortgage needs.', style={
         'textAlign': 'center',
         'color': colors['text']
     }),
 
-    html.Div([
-        dcc.Input(
-            type='number',
-            id='capital',
-            value=60000
+    html.Div(id = 'input-wrapper', children = [
+        html.Div(id='capital-wrapper',children=[
+            dcc.Input(
+                type='number',
+                id='capital',
+                value=60000,
+                style={'width':'100px'}
+                ),
+        html.Div(html.P('needed mortgage (€)'),id='capital-output',style={'display':'inline-block','margin':'10px'})]
         ),
-        dcc.Input(
-            type='number',
-            id='interest-rate',
-            value=2.3
+        html.Div(id='interest-wrapper',children=[
+            dcc.Input(
+                type='number',
+                id='interest-rate',
+                value=2.3,
+                style={'width':'100px'}
+                ),
+        html.Div(html.P('interest rate (%)'),id='interest-output',style={'display':'inline-block','margin':'10px'})]
         ),
-        dcc.Slider(
-            6,40,1,
-            marks={n:str(n) for n in [6]+[i for i in range(10,41,5)]},
-            value=20,
-            id='years',
+        html.Div(id='year-wrapper',children=[
+            dcc.Slider(
+                6,40,1, 
+                marks={n:str(n) for n in [6]+[i for i in range(10,41,5)]},
+                value=20,
+                id='year-slider',
+            ),
+            html.Div(id='year-slider-output')],
+            style = {'textAlign': 'center','margin-top':'10px'}
         )
+
     ],
-        style={'width': '49%', 'display': 'inline-block'}
+        style={'width': '180vh'}
     ),
-
-    html.Div(id='data-summary', style={'margin-top': 20}),
-
-
 
     html.Div(children=[
         dcc.Graph(
@@ -135,16 +152,17 @@ app.layout = html.Div(style={'backgroundColor': colors['background']}, children=
 
 
 @app.callback(
-    [Output('data-summary', 'children'),Output('vis-annuity','figure'),Output('vis-linear','figure')],
+    [Output('year-slider-output', 'children'),
+    Output('vis-annuity','figure'),Output('vis-linear','figure')],
     Input('capital', 'value'),
     Input('interest-rate', 'value'),
-    Input('years', 'value'))
+    Input('year-slider', 'value'))
 def update_output(capital,ir,years):
-
+    year_line = f'{years} years mortgage ({12*years} months)'
     text =  f'Results for a {years} years mortgage ({12*years} months) for capital of {capital} euros, with a {ir:.2f}% interest rate.'
     figs = visualize_mortgages(capital,ir/100,years)
 
-    return text,figs['FR'],figs['IT']
+    return year_line,figs['FR'],figs['IT']
 
 if __name__ == '__main__':
     app.run_server(debug=True)
